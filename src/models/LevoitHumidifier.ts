@@ -1,20 +1,20 @@
+import { CronJob } from 'cron';
 import {
   API,
   CharacteristicValue,
   Logging,
   PlatformAccessory,
   Service,
-  WithUUID,
+  WithUUID
 } from "homebridge";
-import { VesyncClient } from "../api/client";
+import { client } from "../api/client";
 import { HumidiferController } from "../devices/humidifer/controller";
 import { VesyncHumidifer } from "../devices/humidifer/vesyncHumidifer";
-
-const client = new VesyncClient();
 
 export class LevoitHumidifier {
   private readonly humidifierService: Service;
   private readonly humidifierSensorService: Service;
+  private job: CronJob;
 
   constructor(
     private readonly device: VesyncHumidifer,
@@ -26,27 +26,52 @@ export class LevoitHumidifier {
     const hap = api.hap;
     this.humidifierService = this.getOrAddService(
       hap.Service.HumidifierDehumidifier
+    ).setCharacteristic(hap.Characteristic.Manufacturer, "VeSync")
+    
+    this.humidifierSensorService = this.getOrAddService(
+      hap.Service.HumiditySensor
     );
+
+    fanController.getStatus().then(() => {
+      this.addEventListener(fanController)
+    })
+
+    this.job = new CronJob({
+      cronTime: "*/1 * * * *",
+      onTick: async () => {
+        this.log("> [Schedule]");
+        this.log(">> [Request]");
+        await fanController.getStatus().then(() => {
+          this.log(">>> [Update] HumidiferStatus");
+        })
+      },
+      runOnInit: false,
+    })
+    this.job.start();
+  }
+
+  private addEventListener(controller: HumidiferController) {
+    const hap = this.api.hap;
 
     this.humidifierService
       .getCharacteristic(hap.Characteristic.Active)
       .onGet(() => {
-        const isOn = fanController.enabled;
+        const isOn = controller.enabled;
         return isOn
           ? hap.Characteristic.Active.ACTIVE
           : hap.Characteristic.Active.INACTIVE;
       })
       .onSet((value: CharacteristicValue) => {
         const power = value === hap.Characteristic.Active.ACTIVE;
-        fanController.setPower(power);
+        this.log(`>> [request] status => ${power ? 'enable' : 'disable'}`);
+        controller.setPower(power);
         return value;
       });
 
     this.humidifierService
       .getCharacteristic(hap.Characteristic.CurrentHumidifierDehumidifierState)
       .onGet(() => {
-        return hap.Characteristic.CurrentHumidifierDehumidifierState
-          .HUMIDIFYING;
+        return hap.Characteristic.CurrentHumidifierDehumidifierState.HUMIDIFYING;
       });
 
     this.humidifierService
@@ -59,17 +84,20 @@ export class LevoitHumidifier {
       .getCharacteristic(hap.Characteristic.RotationSpeed)
       .setProps({ minStep: 33, maxValue: 99 })
       .onGet(() => {
-        return fanController.targetHumidity;
+        return controller.targetHumidity;
       });
 
-    this.humidifierSensorService = this.getOrAddService(
-      hap.Service.HumiditySensor
-    );
+    this.humidifierService
+      .getCharacteristic(hap.Characteristic.TargetRelativeHumidity)
+      .updateValue(controller.targetHumidity);
+
+    this.humidifierService
+      .getCharacteristic(hap.Characteristic.WaterLevel)
+      .onGet(() => controller.waterLacks ? 0 : 100);
+
     this.humidifierSensorService
       .getCharacteristic(hap.Characteristic.CurrentRelativeHumidity)
-      .onGet(() => {
-        return 100;
-      });
+      .updateValue(controller.humidity);
   }
 
   private getOrAddService<T extends WithUUID<typeof Service>>(
@@ -77,6 +105,6 @@ export class LevoitHumidifier {
   ): Service {
     return (
       this.accessory.getService(service) ?? this.accessory.addService(service)
-    );
+    )
   }
 }

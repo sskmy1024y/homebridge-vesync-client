@@ -4,13 +4,11 @@ import {
   Logging,
   PlatformAccessory,
   Service,
-  WithUUID,
+  WithUUID
 } from "homebridge";
-import { VesyncClient } from "../api/client";
+import { client } from "../api/client";
 import { FanController } from "../devices/fan/fanController";
 import { VesyncFan } from "../devices/fan/vesyncFan";
-
-const client = new VesyncClient();
 
 export class LevoitAirPurifier {
   private readonly airPurifierService: Service;

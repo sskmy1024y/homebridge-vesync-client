@@ -5,15 +5,13 @@ import {
   Logging,
   PlatformAccessory,
   PlatformConfig,
-  UnknownContext,
+  UnknownContext
 } from "homebridge";
-import { VesyncClient } from "./api/client";
+import { client } from "./api/client";
 import { VesyncFan } from "./devices/fan/vesyncFan";
-import { HumidiferController } from "./devices/humidifer/controller";
 import { VesyncHumidifer } from "./devices/humidifer/vesyncHumidifer";
 import { LevoitAirPurifier } from "./models/LevoitAirPurifier";
-
-const client = new VesyncClient();
+import { LevoitHumidifier } from "./models/LevoitHumidifier";
 
 interface Config extends PlatformConfig {
   username: string;
@@ -28,8 +26,9 @@ class VesyncPlatform implements DynamicPlatformPlugin {
     private readonly api: API
   ) {
     this.api.on("didFinishLaunching", async () => {
-      await client.login(config.username, config.password);
-      await this.findDevices();
+      await client.login(config.username, config.password).then(async () => {
+        await this.findDevices();
+      })
     });
   }
 
@@ -43,7 +42,7 @@ class VesyncPlatform implements DynamicPlatformPlugin {
           if (device instanceof VesyncFan) {
             new LevoitAirPurifier(device, this.log, cached, this.api);
           } else if (device instanceof VesyncHumidifer) {
-            new HumidiferController(device, client);
+            new LevoitHumidifier(device, this.log, cached, this.api);
           }
         }
       } else {
@@ -65,7 +64,7 @@ class VesyncPlatform implements DynamicPlatformPlugin {
             device.uuid,
             Categories.AIR_HUMIDIFIER
           );
-          new HumidiferController(device, client);
+          new LevoitHumidifier(device, this.log, platformAccessory, this.api);
           this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [
             platformAccessory,
           ]);

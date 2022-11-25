@@ -27,6 +27,12 @@ export class VesyncClient {
   private accountId: string = null;
   private token: string = null;
 
+  private constructor() {}
+
+  static create() {
+    return new this();
+  } 
+
   post(url, options) {
     return request.post(url, options);
   }
@@ -58,18 +64,18 @@ export class VesyncClient {
 
   async login(username, password) {
     const pwdHashed = crypto.createHash("md5").update(password).digest("hex");
-    const response: any = await this.post("cloud/v1/user/login", {
+    const response: any = await this.post("cloud/v2/user/loginV2", {
       json: {
         acceptLanguage: "en",
-        appVersion: "2.5.1",
+        appVersion: "VeSync 4.1.31 build1",
         phoneBrand: "SM N9005",
         phoneOS: "Android",
         email: username,
         password: pwdHashed,
         devToken: "",
-        userType: 1,
-        method: "login",
-        timeZone: "America/New_York",
+        userType: "1",
+        method: "loginV2",
+        timeZone: "Asia/Tokyo",
         token: "",
         traceId: Date.now(),
       },
@@ -115,3 +121,5 @@ export class VesyncClient {
     return devices;
   }
 }
+
+export const client = VesyncClient.create();

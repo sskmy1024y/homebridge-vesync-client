@@ -17,13 +17,7 @@ export class HumidiferController {
   constructor(
     private readonly humidifer: VesyncHumidifer,
     private readonly client: VesyncClient
-  ) {
-    this.initialize();
-  }
-
-  private async initialize() {
-    await this.getStatus();
-  }
+  ) {}
 
   async getStatus(): Promise<HumidiferStatus> {
     const res = await this.client
@@ -166,5 +160,9 @@ export class HumidiferController {
 
   get targetHumidity(): number {
     return this.status.configuration.auto_target_humidity;
+  }
+
+  get waterLacks(): boolean {
+    return this.status.water_lacks;
   }
 }
